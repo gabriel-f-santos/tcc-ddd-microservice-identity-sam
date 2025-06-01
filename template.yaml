@@ -1,41 +1,142 @@
+# template.yaml - AWS SAM Template para Accounts Service
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
-Description: >
-  identity-service
+Description: 'Accounts Service - Identity and Authentication'
 
-  Sample SAM Template for identity-service
+Parameters:
+  Environment:
+    Type: String
+    Default: dev
+    AllowedValues: [dev, staging, prod]
+    Description: Environment name
 
-# More info about Globals: https://github.com/awslabs/serverless-application-model/blob/master/docs/globals.rst
 Globals:
   Function:
+    Runtime: python3.11
     Timeout: 3
+    MemorySize: 512
+    Environment:
+      Variables:
+        ENVIRONMENT: !Ref Environment
+        LOG_LEVEL: INFO
+        DB_HOST: !GetAtt AccountsDatabase.Endpoint.Address
+        DB_NAME: accounts_db
+        DB_USER: postgres
+        DB_PASSWORD: !Ref DatabasePassword
+        JWT_SECRET: !Ref JWTSecret
+
+Parameters:
+  DatabasePassword:
+    Type: String
+    NoEcho: true
+    Default: dev123456
+    Description: Database password
+  
+  JWTSecret:
+    Type: String
+    NoEcho: true
+    Default: your-jwt-secret-key-change-in-production
+    Description: JWT Secret for token generation
 
 Resources:
-  HelloWorldFunction:
-    Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
+  # Lambda Functions
+  AuthFunction:
+    Type: AWS::Serverless::Function
     Properties:
-      CodeUri: hello_world/
-      Handler: app.lambda_handler
-      Runtime: python3.13
-      Architectures:
-        - x86_64
+      CodeUri: src/
+      Handler: handlers.auth_handler.lambda_handler
+      Description: Handle authentication (login, logout, token validation)
       Events:
-        HelloWorld:
-          Type: Api # More info about API Event Source: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#api
+        AuthLogin:
+          Type: Api
           Properties:
-            Path: /hello
-            Method: get
+            Path: /auth/login
+            Method: POST
+        AuthLogout:
+          Type: Api
+          Properties:
+            Path: /auth/logout
+            Method: POST
+        AuthValidate:
+          Type: Api
+          Properties:
+            Path: /auth/validate
+            Method: POST
+        AuthRefresh:
+          Type: Api
+          Properties:
+            Path: /auth/refresh
+            Method: POST
+      Environment:
+        Variables:
+          FUNCTION_TYPE: auth
+
+  UserFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: handlers.user_handler.lambda_handler
+      Description: Handle user management (CRUD operations)
+      Events:
+        CreateUser:
+          Type: Api
+          Properties:
+            Path: /users
+            Method: POST
+        GetUser:
+          Type: Api
+          Properties:
+            Path: /users/{user_id}
+            Method: GET
+        UpdateUser:
+          Type: Api
+          Properties:
+            Path: /users/{user_id}
+            Method: PUT
+        DeleteUser:
+          Type: Api
+          Properties:
+            Path: /users/{user_id}
+            Method: DELETE
+        ListUsers:
+          Type: Api
+          Properties:
+            Path: /users
+            Method: GET
+      Environment:
+        Variables:
+          FUNCTION_TYPE: user
+
+  # IAM Role for Lambda Functions
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
 
 Outputs:
-  # ServerlessRestApi is an implicit API created out of Events key under Serverless::Function
-  # Find out more about other implicit resources you can reference within SAM
-  # https://github.com/awslabs/serverless-application-model/blob/master/docs/internals/generated_resources.rst#api
-  HelloWorldApi:
-    Description: "API Gateway endpoint URL for Prod stage for Hello World function"
-    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/hello/"
-  HelloWorldFunction:
-    Description: "Hello World Lambda Function ARN"
-    Value: !GetAtt HelloWorldFunction.Arn
-  HelloWorldFunctionIamRole:
-    Description: "Implicit IAM Role created for Hello World function"
-    Value: !GetAtt HelloWorldFunctionRole.Arn
+  AccountsApiUrl:
+    Description: "API Gateway endpoint URL for Accounts service"
+    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/"
+    Export:
+      Name: !Sub "${Environment}-accounts-api-url"
+
+  AuthFunctionName:
+    Description: "Auth Lambda Function Name"
+    Value: !Ref AuthFunction
+    Export:
+      Name: !Sub "${Environment}-auth-function"
+
+  UserFunctionName:
+    Description: "User Lambda Function Name" 
+    Value: !Ref UserFunction
+    Export:
+      Name: !Sub "${Environment}-user-function"
