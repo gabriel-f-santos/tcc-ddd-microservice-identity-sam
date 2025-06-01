@@ -1,142 +1,161 @@
-# template.yaml - AWS SAM Template para Accounts Service
+# template.yaml - Updated SAM Template
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
-Description: 'Accounts Service - Identity and Authentication'
+Description: 'Accounts Service - Pure Lambda Handlers'
 
 Parameters:
   Environment:
     Type: String
     Default: dev
     AllowedValues: [dev, staging, prod]
-    Description: Environment name
+  
+  DatabasePassword:
+    Type: String
+    NoEcho: true
+    Default: dev123456
+  
+  JWTSecret:
+    Type: String
+    NoEcho: true
+    Default: your-jwt-secret-key
 
 Globals:
   Function:
-    Runtime: python3.11
-    Timeout: 3
+    Runtime: python3.13
+    Timeout: 30
     MemorySize: 512
     Environment:
       Variables:
         ENVIRONMENT: !Ref Environment
         LOG_LEVEL: INFO
-        DB_HOST: !GetAtt AccountsDatabase.Endpoint.Address
-        DB_NAME: accounts_db
-        DB_USER: postgres
-        DB_PASSWORD: !Ref DatabasePassword
         JWT_SECRET: !Ref JWTSecret
-
-Parameters:
-  DatabasePassword:
-    Type: String
-    NoEcho: true
-    Default: dev123456
-    Description: Database password
-  
-  JWTSecret:
-    Type: String
-    NoEcho: true
-    Default: your-jwt-secret-key-change-in-production
-    Description: JWT Secret for token generation
+        JWT_ALGORITHM: HS256
 
 Resources:
-  # Lambda Functions
-  AuthFunction:
+  # Auth Functions
+  LoginFunction:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: src/
-      Handler: handlers.auth_handler.lambda_handler
-      Description: Handle authentication (login, logout, token validation)
+      Handler: handlers.auth_handler.login_handler
+      Description: User login
       Events:
-        AuthLogin:
+        Login:
           Type: Api
           Properties:
             Path: /auth/login
             Method: POST
-        AuthLogout:
-          Type: Api
-          Properties:
-            Path: /auth/logout
-            Method: POST
-        AuthValidate:
-          Type: Api
-          Properties:
-            Path: /auth/validate
-            Method: POST
-        AuthRefresh:
-          Type: Api
-          Properties:
-            Path: /auth/refresh
-            Method: POST
-      Environment:
-        Variables:
-          FUNCTION_TYPE: auth
 
-  UserFunction:
+  ChangePasswordFunction:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: src/
-      Handler: handlers.user_handler.lambda_handler
-      Description: Handle user management (CRUD operations)
+      Handler: handlers.auth_handler.change_password_handler
+      Description: Change user password
+      Events:
+        ChangePassword:
+          Type: Api
+          Properties:
+            Path: /auth/change-password
+            Method: POST
+
+  GetCurrentUserFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: handlers.auth_handler.get_current_user_handler
+      Description: Get current user info
+      Events:
+        GetCurrentUser:
+          Type: Api
+          Properties:
+            Path: /auth/me
+            Method: GET
+
+  # User Management Functions
+  CreateUserFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: handlers.user_handler.create_user_handler
+      Description: Create new user
       Events:
         CreateUser:
           Type: Api
           Properties:
             Path: /users
             Method: POST
+
+  GetUsersFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: handlers.user_handler.get_users_handler
+      Description: Get users with pagination
+      Events:
+        GetUsers:
+          Type: Api
+          Properties:
+            Path: /users
+            Method: GET
+
+  GetUserFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: handlers.user_handler.get_user_handler
+      Description: Get user by ID
+      Events:
         GetUser:
           Type: Api
           Properties:
             Path: /users/{user_id}
             Method: GET
+
+  UpdateUserFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: handlers.user_handler.update_user_handler
+      Description: Update user
+      Events:
         UpdateUser:
           Type: Api
           Properties:
             Path: /users/{user_id}
             Method: PUT
+
+  DeleteUserFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: handlers.user_handler.delete_user_handler
+      Description: Delete user
+      Events:
         DeleteUser:
           Type: Api
           Properties:
             Path: /users/{user_id}
             Method: DELETE
-        ListUsers:
+
+  # Utility Functions
+  HealthCheckFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: src/
+      Handler: handlers.health_handler.health_check_handler
+      Description: Health check
+      Events:
+        HealthCheck:
           Type: Api
           Properties:
-            Path: /users
+            Path: /health
             Method: GET
-      Environment:
-        Variables:
-          FUNCTION_TYPE: user
 
-  # IAM Role for Lambda Functions
-  LambdaExecutionRole:
-    Type: AWS::IAM::Role
-    Properties:
-      AssumeRolePolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Effect: Allow
-            Principal:
-              Service: lambda.amazonaws.com
-            Action: sts:AssumeRole
-      ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
-        - arn:aws:iam::aws:policy/service-role/AWSLambdaVPCAccessExecutionRole
 
 Outputs:
   AccountsApiUrl:
-    Description: "API Gateway endpoint URL for Accounts service"
+    Description: "API Gateway endpoint URL"
     Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/"
     Export:
       Name: !Sub "${Environment}-accounts-api-url"
-
-  AuthFunctionName:
-    Description: "Auth Lambda Function Name"
-    Value: !Ref AuthFunction
-    Export:
-      Name: !Sub "${Environment}-auth-function"
-
-  UserFunctionName:
-    Description: "User Lambda Function Name" 
-    Value: !Ref UserFunction
-    Export:
-      Name: !Sub "${Environment}-user-function"

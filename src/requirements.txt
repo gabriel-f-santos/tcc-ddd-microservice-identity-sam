@@ -1,1 +1,7 @@
 requests
+sqlalchemy
+psycopg2-binary
+pydantic
+python-jose[cryptography]
+alembic
+structlog
