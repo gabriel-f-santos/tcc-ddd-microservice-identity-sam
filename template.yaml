@@ -36,8 +36,8 @@ Resources:
   LoginFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: src/
-      Handler: handlers.auth_handler.login_handler
+      CodeUri: .
+      Handler: src.handlers.auth_handler.login_handler
       Description: User login
       Events:
         Login:
@@ -49,8 +49,8 @@ Resources:
   ChangePasswordFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: src/
-      Handler: handlers.auth_handler.change_password_handler
+      CodeUri: .
+      Handler: src.handlers.auth_handler.change_password_handler
       Description: Change user password
       Events:
         ChangePassword:
@@ -62,8 +62,8 @@ Resources:
   GetCurrentUserFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: src/
-      Handler: handlers.auth_handler.get_current_user_handler
+      CodeUri: .
+      Handler: src.handlers.auth_handler.get_current_user_handler
       Description: Get current user info
       Events:
         GetCurrentUser:
@@ -76,8 +76,8 @@ Resources:
   CreateUserFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: src/
-      Handler: handlers.user_handler.create_user_handler
+      CodeUri: .
+      Handler: src.handlers.user_handler.create_user_handler
       Description: Create new user
       Events:
         CreateUser:
@@ -89,8 +89,8 @@ Resources:
   GetUsersFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: src/
-      Handler: handlers.user_handler.get_users_handler
+      CodeUri: .
+      Handler: src.handlers.user_handler.get_users_handler
       Description: Get users with pagination
       Events:
         GetUsers:
@@ -102,8 +102,8 @@ Resources:
   GetUserFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: src/
-      Handler: handlers.user_handler.get_user_handler
+      CodeUri: .
+      Handler: src.handlers.user_handler.get_user_handler
       Description: Get user by ID
       Events:
         GetUser:
@@ -115,8 +115,8 @@ Resources:
   UpdateUserFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: src/
-      Handler: handlers.user_handler.update_user_handler
+      CodeUri: .
+      Handler: src.handlers.user_handler.update_user_handler
       Description: Update user
       Events:
         UpdateUser:
@@ -128,8 +128,8 @@ Resources:
   DeleteUserFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: src/
-      Handler: handlers.user_handler.delete_user_handler
+      CodeUri: .
+      Handler: src.handlers.user_handler.delete_user_handler
       Description: Delete user
       Events:
         DeleteUser:
@@ -142,8 +142,8 @@ Resources:
   HealthCheckFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: src/
-      Handler: handlers.health_handler.health_check_handler
+      CodeUri: .
+      Handler: src.handlers.health_handler.health_check_handler
       Description: Health check
       Events:
         HealthCheck:

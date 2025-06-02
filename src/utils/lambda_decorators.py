@@ -57,40 +57,46 @@ def lambda_handler(func: Callable) -> Callable:
     """
     @functools.wraps(func)
     def wrapper(event: Dict[str, Any], context: Any) -> Dict[str, Any]:
-        try:
-            # Parse do body se existir
-            body = {}
-            if event.get("body"):
-                body = json.loads(event["body"])
-            
-            # Parse dos path parameters
-            path_params = event.get("pathParameters") or {}
-            
-            # Parse dos query parameters
-            query_params = event.get("queryStringParameters") or {}
-            
-            # Executar função
-            result = func(event, context, body, path_params, query_params)
-            
-            # Se retornou LambdaResponse, converter
-            if isinstance(result, LambdaResponse):
-                return result.to_dict()
-            
-            # Se retornou dict simples, wrap em LambdaResponse
-            return LambdaResponse(200, result).to_dict()
-            
-        except LambdaException as e:
-            return LambdaResponse(
-                status_code=e.status_code,
-                body={"detail": e.detail}
-            ).to_dict()
-            
-        except Exception as e:
-            logger.error("Lambda handler error", error=str(e))
-            return LambdaResponse(
-                status_code=500,
-                body={"detail": "Internal server error"}
-            ).to_dict()
+        import asyncio
+        
+        async def async_wrapper():
+            try:
+                # Parse do body se existir
+                body = {}
+                if event.get("body"):
+                    body = json.loads(event["body"])
+                
+                # Parse dos path parameters
+                path_params = event.get("pathParameters") or {}
+                
+                # Parse dos query parameters
+                query_params = event.get("queryStringParameters") or {}
+                
+                # Executar função ASYNC
+                result = await func(event, context, body, path_params, query_params)
+                
+                # Se retornou LambdaResponse, converter
+                if isinstance(result, LambdaResponse):
+                    return result.to_dict()
+                
+                # Se retornou dict simples, wrap em LambdaResponse
+                return LambdaResponse(200, result).to_dict()
+                
+            except LambdaException as e:
+                return LambdaResponse(
+                    status_code=e.status_code,
+                    body={"detail": e.detail}
+                ).to_dict()
+                
+            except Exception as e:
+                logger.error("Lambda handler error", error=str(e))
+                return LambdaResponse(
+                    status_code=500,
+                    body={"detail": "Internal server error"}
+                ).to_dict()
+        
+        # Executar função async usando asyncio
+        return asyncio.run(async_wrapper())
     
     return wrapper
 

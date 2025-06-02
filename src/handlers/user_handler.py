@@ -27,11 +27,13 @@ async def create_user_handler(
     event, context, body, path_params, query_params,
     current_user: Usuario, db: AsyncSession, dto: UsuarioCreateDTO
 ):
+    
     """Handler for creating new user."""
+    print("Creating user with data:", dto.dict())
     try:
         user_service = UsuarioApplicationService(db)
         user_response = await user_service.create_user(dto)
-        
+
         return created_response(user_response.dict())
         
     except ValidationException as e:

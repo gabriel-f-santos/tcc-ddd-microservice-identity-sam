@@ -1,0 +1,56 @@
+# .samignore - Arquivo na raiz do projeto
+# Ignorar arquivos desnecessários no build SAM
+
+# Ambientes virtuais
+venv/
+env/
+.venv/
+.env/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# Pytest
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Build artifacts
+.aws-sam/
+dist/
+build/
+*.egg-info/
+
+# Local config files
+.env
+.env.local
+config.local.py
+
+# Logs
+*.log
+logs/
+
+# Documentation
+docs/
+README.md
+
+# Tests (opcional, se não quiser incluir)
+tests/
+*_test.py
+test_*.py
