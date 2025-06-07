@@ -1,4 +1,3 @@
-# template.yaml - Updated SAM Template
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: 'Accounts Service - Pure Lambda Handlers'
@@ -30,8 +29,25 @@ Globals:
         LOG_LEVEL: INFO
         JWT_SECRET: !Ref JWTSecret
         JWT_ALGORITHM: HS256
+    Tags:
+      Service: identidade
 
 Resources:
+  AccountsApi:
+    Type: AWS::Serverless::Api
+    Properties:
+      StageName: Prod
+      Auth:
+        DefaultAuthorizer: LambdaAuthorizer
+        AddDefaultAuthorizerToCorsPreflight: false
+        Authorizers:
+          LambdaAuthorizer:
+            FunctionArn: !GetAtt AuthFunction.Arn
+            Identity:
+              Header: Authorization
+      Tags:
+        Service: identidade
+
   # Auth Functions
   LoginFunction:
     Type: AWS::Serverless::Function
@@ -151,6 +167,8 @@ Resources:
           Properties:
             Path: /health
             Method: GET
+            Auth:
+              Authorizer: NONE
 
   AuthFunction:
     Type: AWS::Serverless::Function
