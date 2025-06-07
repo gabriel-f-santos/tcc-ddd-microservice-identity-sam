@@ -75,6 +75,8 @@ Resources:
             RestApiId: !Ref AccountsApi
             Path: /auth/login
             Method: POST
+            Auth:
+              Authorizer: NONE
 
   ChangePasswordFunction:
     Type: AWS::Serverless::Function
@@ -117,6 +119,8 @@ Resources:
             RestApiId: !Ref AccountsApi
             Path: /users
             Method: POST
+            Auth:
+              Authorizer: NONE
 
   GetUsersFunction:
     Type: AWS::Serverless::Function
