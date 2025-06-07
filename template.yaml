@@ -30,9 +30,22 @@ Globals:
         JWT_SECRET: !Ref JWTSecret
         JWT_ALGORITHM: HS256
     Tags:
-      Service: identidade
+      Service: identidade   # aplica a tag em todas as Lambdas
 
 Resources:
+
+  # 1) Autorizer Lambda
+  AuthFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: src.handlers.authorizer.lambda_handler
+      CodeUri: .
+      Policies:
+        - AWSLambdaBasicExecutionRole
+      Tags:
+        Service: identidade
+
+  # 2) API Gateway explícito para podermos ter DefaultAuthorizer
   AccountsApi:
     Type: AWS::Serverless::Api
     Properties:
@@ -48,7 +61,7 @@ Resources:
       Tags:
         Service: identidade
 
-  # Auth Functions
+  # 3) Todas as suas funções apontando para este API
   LoginFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -59,6 +72,7 @@ Resources:
         Login:
           Type: Api
           Properties:
+            RestApiId: !Ref AccountsApi
             Path: /auth/login
             Method: POST
 
@@ -72,6 +86,7 @@ Resources:
         ChangePassword:
           Type: Api
           Properties:
+            RestApiId: !Ref AccountsApi
             Path: /auth/change-password
             Method: POST
 
@@ -85,10 +100,10 @@ Resources:
         GetCurrentUser:
           Type: Api
           Properties:
+            RestApiId: !Ref AccountsApi
             Path: /auth/me
             Method: GET
 
-  # User Management Functions
   CreateUserFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -99,6 +114,7 @@ Resources:
         CreateUser:
           Type: Api
           Properties:
+            RestApiId: !Ref AccountsApi
             Path: /users
             Method: POST
 
@@ -112,6 +128,7 @@ Resources:
         GetUsers:
           Type: Api
           Properties:
+            RestApiId: !Ref AccountsApi
             Path: /users
             Method: GET
 
@@ -125,6 +142,7 @@ Resources:
         GetUser:
           Type: Api
           Properties:
+            RestApiId: !Ref AccountsApi
             Path: /users/{user_id}
             Method: GET
 
@@ -138,6 +156,7 @@ Resources:
         UpdateUser:
           Type: Api
           Properties:
+            RestApiId: !Ref AccountsApi
             Path: /users/{user_id}
             Method: PUT
 
@@ -151,10 +170,11 @@ Resources:
         DeleteUser:
           Type: Api
           Properties:
+            RestApiId: !Ref AccountsApi
             Path: /users/{user_id}
             Method: DELETE
 
-  # Utility Functions
+  # 4) HealthCheck como público (override para NONE)
   HealthCheckFunction:
     Type: AWS::Serverless::Function
     Properties:
@@ -165,25 +185,18 @@ Resources:
         HealthCheck:
           Type: Api
           Properties:
+            RestApiId: !Ref AccountsApi
             Path: /health
             Method: GET
             Auth:
               Authorizer: NONE
 
-  AuthFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      Handler: src.handlers.authorizer.lambda_handler
-      CodeUri: .
-      Policies: 
-        - AWSLambdaBasicExecutionRole
-
 Outputs:
   AccountsApiUrl:
     Description: "API Gateway endpoint URL"
-    Value: !Sub "https://${ServerlessRestApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/"
+    Value: !Sub "https://${AccountsApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/"
     Export:
-      Name: !Sub "${Environment}-accounts-api-url"
+      Name: !Sub "accounts-api-url"
 
   AuthFunctionArn:
     Description: "Lambda ARN do authorizer"
