@@ -18,6 +18,10 @@ Parameters:
     NoEcho: true
     Default: your-jwt-secret-key
 
+  DatabaseUrlParameter:
+    Type: AWS::SSM::Parameter::Value<String>    # ou <SecureString>
+    Default: /secret/database_url
+
 Globals:
   Function:
     Runtime: python3.13
@@ -29,6 +33,7 @@ Globals:
         LOG_LEVEL: INFO
         JWT_SECRET: !Ref JWTSecret
         JWT_ALGORITHM: HS256
+        DATABASE_URL: !Ref DatabaseUrlParameter
     Tags:
       Service: identidade   # aplica a tag em todas as Lambdas
 
