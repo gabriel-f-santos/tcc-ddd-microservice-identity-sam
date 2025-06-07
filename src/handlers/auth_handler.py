@@ -67,3 +67,81 @@ async def get_current_user_handler(
     }
     
     return success_response(user_info)
+
+# src/handlers/authorizer.py
+
+import os
+import logging
+import jwt
+from jwt import InvalidTokenError
+
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+
+
+# Segredo e algoritmo devem ser iguais aos usados no seu AuthApplicationService
+JWT_SECRET = os.environ["JWT_SECRET_KEY"]
+JWT_ALGO = os.environ.get("JWT_ALGO", "HS256")
+
+def generate_policy(principal_id: str, effect: str, resource: str, context: dict):
+    """
+    Monta o retorno esperado pelo API Gateway Lambda Authorizer:
+    {
+      "principalId": "...",
+      "policyDocument": { ... },
+      "context": { ... }
+    }
+    """
+    auth_response = {
+        "principalId": principal_id,
+        "context": context
+    }
+    policy_document = {
+        "Version": "2012-10-17",
+        "Statement": [
+            {
+                "Action": "execute-api:Invoke",
+                "Effect": effect,
+                "Resource": resource
+            }
+        ]
+    }
+    auth_response["policyDocument"] = policy_document
+    return auth_response
+
+def lambda_handler(event, context):
+    """
+    Espera receber o event com:
+      event['type'] == 'TOKEN'
+      event['authorizationToken'] == 'TOKEN <jwt>'
+      event['methodArn'] == 'arn:aws:execute-api:...'
+    """
+    token_str = event.get("authorizationToken", "")
+    method_arn = event.get("methodArn")
+    
+    if not token_str.startswith("TOKEN "):
+        logger.warning("Authorization header inválido: %s", token_str)
+        return generate_policy("unauthorized", "Deny", method_arn, {})
+    
+    jwt_token = token_str.split(" ", 1)[1]
+    
+    try:
+        auth_service = AuthApplicationService()  # Inicialize conforme necessário
+
+        # Verifica se o JWT é válido
+        usuario: Usuario = auth_service.verify_token(jwt_token)
+        # Decodifica o JWT e extrai claims
+        
+        # Contexto extra que ficará disponível no requestContext.authorizer
+        context_extra = {
+            "userId": usuario.id,
+            "email": usuario.email.valor,
+            # Strings são obrigatórias no context; arrays podem virar string JSON
+            "permissoes": ",".join(usuario.permissoes),
+        }
+        
+        return generate_policy(usuario.id, "Allow", method_arn, context_extra)
+    
+    except InvalidTokenError as e:
+        logger.error("Token inválido: %s", e)
+        return generate_policy("unauthorized", "Deny", method_arn, {})
