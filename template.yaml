@@ -36,6 +36,13 @@ Globals:
         DATABASE_URL: !Ref DatabaseUrlParameter
     Tags:
       Service: identidade   # aplica a tag em todas as Lambdas
+    VpcConfig:
+      SecurityGroupIds:
+        - sg-0023175edfd49ca18
+      SubnetIds:
+        - subnet-0f12951fa6cccef8e #privada
+        - subnet-0d9dc74d2a9c8c4f6 #privada
+
 
 Resources:
 
@@ -78,7 +85,7 @@ Resources:
           Type: Api
           Properties:
             RestApiId: !Ref AccountsApi
-            Path: /auth/login
+            Path: /api/v1/auth/login
             Method: POST
             Auth:
               Authorizer: NONE
@@ -94,7 +101,7 @@ Resources:
           Type: Api
           Properties:
             RestApiId: !Ref AccountsApi
-            Path: /auth/change-password
+            Path: /api/v1/auth/change-password
             Method: POST
 
   GetCurrentUserFunction:
@@ -108,7 +115,7 @@ Resources:
           Type: Api
           Properties:
             RestApiId: !Ref AccountsApi
-            Path: /auth/me
+            Path: /api/v1/auth/me
             Method: GET
 
   CreateUserFunction:
@@ -122,7 +129,7 @@ Resources:
           Type: Api
           Properties:
             RestApiId: !Ref AccountsApi
-            Path: /users
+            Path: /api/v1/users
             Method: POST
             Auth:
               Authorizer: NONE
@@ -138,7 +145,7 @@ Resources:
           Type: Api
           Properties:
             RestApiId: !Ref AccountsApi
-            Path: /users
+            Path: /api/v1/users
             Method: GET
 
   GetUserFunction:
@@ -152,7 +159,7 @@ Resources:
           Type: Api
           Properties:
             RestApiId: !Ref AccountsApi
-            Path: /users/{user_id}
+            Path: /api/v1/users/{user_id}
             Method: GET
 
   UpdateUserFunction:
@@ -166,7 +173,7 @@ Resources:
           Type: Api
           Properties:
             RestApiId: !Ref AccountsApi
-            Path: /users/{user_id}
+            Path: /api/v1/users/{user_id}
             Method: PUT
 
   DeleteUserFunction:
@@ -180,7 +187,7 @@ Resources:
           Type: Api
           Properties:
             RestApiId: !Ref AccountsApi
-            Path: /users/{user_id}
+            Path: /api/v1/users/{user_id}
             Method: DELETE
 
   # 4) HealthCheck como público (override para NONE)
@@ -195,7 +202,7 @@ Resources:
           Type: Api
           Properties:
             RestApiId: !Ref AccountsApi
-            Path: /health
+            Path: /api/v1/health
             Method: GET
             Auth:
               Authorizer: NONE
@@ -205,10 +212,10 @@ Outputs:
     Description: "API Gateway endpoint URL"
     Value: !Sub "https://${AccountsApi}.execute-api.${AWS::Region}.amazonaws.com/Prod/"
     Export:
-      Name: !Sub "accounts-api-url"
+      Name: "accounts-api-url"
 
   AuthFunctionArn:
     Description: "Lambda ARN do authorizer"
     Value: !GetAtt AuthFunction.Arn
     Export:
-      Name: !Sub "AuthFunctionArn"
+      Name: "AuthFunctionArn"
