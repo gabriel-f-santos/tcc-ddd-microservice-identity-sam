@@ -2,6 +2,7 @@
 """Authentication Lambda handlers."""
 
 import asyncio
+import json
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -80,50 +81,47 @@ async def get_current_user_handler(
 # src/handlers/authorizer.py
 def generate_policy(principal_id: str, effect: str, resource: str, context: dict):
     """
-    Monta o retorno esperado pelo API Gateway Lambda Authorizer:
-    {
-      "principalId": "...",
-      "policyDocument": { ... },
-      "context": { ... }
-    }
+    Versão mais robusta da policy
     """
+    # Extrair o ARN base para criar wildcard
+    # arn:aws:execute-api:region:account:api-id/stage/method/resource
+    arn_parts = resource.split('/')
+    if len(arn_parts) >= 3:
+        # Permite acesso a toda a API
+        base_arn = '/'.join(arn_parts[:3])  # arn:aws:execute-api:region:account:api-id/stage
+        wildcard_resource = f"{base_arn}/*/*"
+    else:
+        wildcard_resource = resource
+    
     auth_response = {
         "principalId": principal_id,
-        "context": context
+        "context": context,
+        "policyDocument": {
+            "Version": "2012-10-17",
+            "Statement": [
+                {
+                    "Action": "execute-api:Invoke",
+                    "Effect": effect,
+                    "Resource": wildcard_resource
+                }
+            ]
+        }
     }
-    policy_document = {
-        "Version": "2012-10-17",
-        "Statement": [
-            {
-                "Action": "execute-api:Invoke",
-                "Effect": effect,
-                "Resource": resource
-            }
-        ]
-    }
-    auth_response["policyDocument"] = policy_document
+    
     return auth_response
 
 @with_database
-async def auth_handler_with_db(event, context, db: AsyncSession):
+async def auth_handler_with_db(event, context, db: AsyncSession, token: str = None, method_arn: str = None):
     """
     Lambda Authorizer usando decorator @with_database.
     """
-    token_str = event.get("authorizationToken", "")
-    method_arn = event.get("methodArn")
-    
-    if not token_str.startswith("Bearer "):
-        logger.warning("Authorization header inválido: %s", token_str)
-        return generate_policy("unauthorized", "Deny", method_arn, {})
-    
-    jwt_token = token_str.split(" ", 1)[1]
     
     try:
         # ✅ Agora tem acesso ao db via decorator
         auth_service = AuthApplicationService(db)
         
         # Verificar token
-        usuario = await auth_service.verify_token(jwt_token)
+        usuario = await auth_service.verify_token(token)
         
         if not usuario or not usuario.ativo:
             raise InvalidTokenError("User not found or inactive")
@@ -138,7 +136,11 @@ async def auth_handler_with_db(event, context, db: AsyncSession):
 
         logger.warning("Authorization: %s", context_extra)
         
-        return generate_policy(str(usuario.id), "Allow", method_arn, context_extra)
+        policy_response = generate_policy(str(usuario.id), "Allow", method_arn, context_extra)
+
+        logger.warning("Policy response jwt: %s", json.dumps(policy_response, default=str))
+
+        return policy_response
     
     except InvalidTokenError as e:
         logger.error("Token inválido: %s", e)
@@ -146,4 +148,45 @@ async def auth_handler_with_db(event, context, db: AsyncSession):
 
 def auth_handler(event, context):
     """Entry point que converte async para sync."""
-    return asyncio.run(auth_handler_with_db(event, context))
+    token_str = event.get("authorizationToken", "")
+    method_arn = event.get("methodArn")
+    
+    # 🔍 DEBUG: Log completo do event
+    logger.warning("Event completo: %s", json.dumps(event, default=str))
+    logger.warning("Method ARN: %s", method_arn)
+    
+    if not token_str.startswith("Bearer "):
+        logger.warning("Authorization header inválido: %s", token_str)
+        return generate_policy("unauthorized", "Deny", method_arn, {})
+    
+    token = token_str.split(" ", 1)[1]
+    logger.info("Token recebido: %s", token)
+    
+    if len(token) == 36 and all(c in "0123456789abcdef-" for c in token.lower()):
+        logger.info("Token é um UUID4, possivelmente um internal API key")
+    
+    if token == get_settings().internal_api_key:
+        logger.info("Internal API key detected, allowing access without authentication")
+        permissoes = ["admin:*"]
+        # 🔧 Policy mais permissiva
+
+        context_extra = {
+            "userId": "serviceAuth",
+            "email": "service@internal",
+            "permissoes": ",".join(permissoes),
+        }
+
+        policy_response = generate_policy(
+            "internal_api_key", 
+            "Allow", 
+            method_arn, 
+            context_extra
+        )
+        
+        # 🔍 DEBUG: Log da policy response
+        logger.warning("Policy response: %s", json.dumps(policy_response, default=str))
+        
+        return policy_response
+    
+    logger.info("Token é um JWT, processando autenticação")
+    return asyncio.run(auth_handler_with_db(event, context, token=token, method_arn=method_arn))

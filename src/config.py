@@ -57,7 +57,9 @@ class Settings(BaseSettings):
     # Pagination
     default_page_size: int = Field(default=20, description="Default pagination size")
     max_page_size: int = Field(default=100, description="Maximum pagination size")
-
+    internal_api_key: Optional[str] = Field(
+        default=None, description="Internal API key for service-to-service communication"
+    )
 
 @lru_cache()
 def get_settings() -> Settings:
