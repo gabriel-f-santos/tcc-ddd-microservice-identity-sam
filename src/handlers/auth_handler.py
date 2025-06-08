@@ -12,8 +12,16 @@ from src.identidade.application.services.auth_application_service import AuthApp
 from src.identidade.application.dto.auth_dto import LoginDTO, ChangePasswordDTO
 from src.identidade.domain.entities.usuario import Usuario
 from src.shared.domain.exceptions.base import ValidationException, BusinessRuleException
+from src.config import get_settings
+
+from jwt import InvalidTokenError
 
 logger = structlog.get_logger()
+
+# Segredo e algoritmo devem ser iguais aos usados no seu AuthApplicationService
+JWT_SECRET = get_settings().jwt_secret_key
+JWT_ALGO = get_settings().jwt_algorithm
+
 
 
 @lambda_handler
@@ -69,20 +77,6 @@ async def get_current_user_handler(
     return success_response(user_info)
 
 # src/handlers/authorizer.py
-
-import os
-import logging
-import jwt
-from jwt import InvalidTokenError
-
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
-
-
-# Segredo e algoritmo devem ser iguais aos usados no seu AuthApplicationService
-JWT_SECRET = os.environ["JWT_SECRET_KEY"]
-JWT_ALGO = os.environ.get("JWT_ALGO", "HS256")
-
 def generate_policy(principal_id: str, effect: str, resource: str, context: dict):
     """
     Monta o retorno esperado pelo API Gateway Lambda Authorizer:
@@ -109,7 +103,7 @@ def generate_policy(principal_id: str, effect: str, resource: str, context: dict
     auth_response["policyDocument"] = policy_document
     return auth_response
 
-def lambda_handler(event, context):
+def auth_handler(event, context):
     """
     Espera receber o event com:
       event['type'] == 'TOKEN'
@@ -119,7 +113,7 @@ def lambda_handler(event, context):
     token_str = event.get("authorizationToken", "")
     method_arn = event.get("methodArn")
     
-    if not token_str.startswith("TOKEN "):
+    if not token_str.startswith("Bearer "):
         logger.warning("Authorization header inválido: %s", token_str)
         return generate_policy("unauthorized", "Deny", method_arn, {})
     

@@ -50,7 +50,7 @@ Resources:
   AuthFunction:
     Type: AWS::Serverless::Function
     Properties:
-      Handler: src.handlers.authorizer.lambda_handler
+      Handler: src.handlers.auth_handler.auth_handler
       CodeUri: .
       Policies:
         - AWSLambdaBasicExecutionRole

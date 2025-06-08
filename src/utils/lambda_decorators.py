@@ -11,7 +11,7 @@ from jose import JWTError, jwt
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from src.config import get_settings
-from src.shared.infrastructure.database.connection import get_async_session
+from src.shared.infrastructure.database.connection import get_async_session, async_session_factory, init_db
 from src.identidade.infrastructure.repositories.sqlalchemy_usuario_repository import (
     SqlAlchemyUsuarioRepository
 )
@@ -108,6 +108,8 @@ def with_database(func: Callable) -> Callable:
     """
     @functools.wraps(func)
     async def wrapper(*args, **kwargs):
+        if not async_session_factory:
+            await init_db(settings.database_url)
         async for db_session in get_async_session():
             try:
                 # Adiciona db_session aos kwargs
