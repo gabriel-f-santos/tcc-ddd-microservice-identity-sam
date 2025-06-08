@@ -1,6 +1,7 @@
 # src/handlers/auth_handler.py
 """Authentication Lambda handlers."""
 
+import asyncio
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -103,12 +104,10 @@ def generate_policy(principal_id: str, effect: str, resource: str, context: dict
     auth_response["policyDocument"] = policy_document
     return auth_response
 
-def auth_handler(event, context):
+@with_database
+async def auth_handler_with_db(event, context, db: AsyncSession):
     """
-    Espera receber o event com:
-      event['type'] == 'TOKEN'
-      event['authorizationToken'] == 'TOKEN <jwt>'
-      event['methodArn'] == 'arn:aws:execute-api:...'
+    Lambda Authorizer usando decorator @with_database.
     """
     token_str = event.get("authorizationToken", "")
     method_arn = event.get("methodArn")
@@ -120,22 +119,31 @@ def auth_handler(event, context):
     jwt_token = token_str.split(" ", 1)[1]
     
     try:
-        auth_service = AuthApplicationService()  # Inicialize conforme necessário
-
-        # Verifica se o JWT é válido
-        usuario: Usuario = auth_service.verify_token(jwt_token)
-        # Decodifica o JWT e extrai claims
+        # ✅ Agora tem acesso ao db via decorator
+        auth_service = AuthApplicationService(db)
         
-        # Contexto extra que ficará disponível no requestContext.authorizer
+        # Verificar token
+        usuario = await auth_service.verify_token(jwt_token)
+        
+        if not usuario or not usuario.ativo:
+            raise InvalidTokenError("User not found or inactive")
+        
+        logger.warning("permissoes: %s", usuario.permissoes)
+        
         context_extra = {
-            "userId": usuario.id,
+            "userId": str(usuario.id),
             "email": usuario.email.valor,
-            # Strings são obrigatórias no context; arrays podem virar string JSON
-            "permissoes": ",".join(usuario.permissoes),
+            "permissoes": ",".join([p.to_string() for p in usuario.permissoes]),
         }
+
+        logger.warning("Authorization: %s", context_extra)
         
-        return generate_policy(usuario.id, "Allow", method_arn, context_extra)
+        return generate_policy(str(usuario.id), "Allow", method_arn, context_extra)
     
     except InvalidTokenError as e:
         logger.error("Token inválido: %s", e)
         return generate_policy("unauthorized", "Deny", method_arn, {})
+
+def auth_handler(event, context):
+    """Entry point que converte async para sync."""
+    return asyncio.run(auth_handler_with_db(event, context))
