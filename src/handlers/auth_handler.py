@@ -86,12 +86,17 @@ def generate_policy(principal_id: str, effect: str, resource: str, context: dict
     # Extrair o ARN base para criar wildcard
     # arn:aws:execute-api:region:account:api-id/stage/method/resource
     arn_parts = resource.split('/')
+    logger.warning("ARN parts: %s", arn_parts)
     if len(arn_parts) >= 3:
         # Permite acesso a toda a API
-        base_arn = '/'.join(arn_parts[:3])  # arn:aws:execute-api:region:account:api-id/stage
-        wildcard_resource = f"{base_arn}/*/*"
+        # arn_parts = resource.split('/')
+        base_arn = '/'.join(arn_parts[:2])         # arn:aws:execute-api:…:api-id/stage
+        wildcard_resource = f"{base_arn}/*"        # stage/* cobre todos os métodos e paths
+
     else:
         wildcard_resource = resource
+
+    logger.warning("Wildcard resource: %s", wildcard_resource)
     
     auth_response = {
         "principalId": principal_id,
